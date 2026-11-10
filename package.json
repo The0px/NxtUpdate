@@ -1,6 +1,6 @@
 {
   "name": "nxtupdate",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Universal package updater for macOS - auto-detects and updates everything",
   "type": "module",
   "bin": {
@@ -46,7 +46,7 @@
     "react-devtools-core": "^7.0.1"
   },
   "overrides": {
-    "shell-quote": "1.10.0",
+    "shell-quote": "1.11.0",
     "ws": "8.21.1"
   },
   "dependencies": {

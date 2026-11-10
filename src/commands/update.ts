@@ -107,7 +107,7 @@ export async function updateCommand(options: CliOptions) {
     }
 
     managers = selected;
-  } else if (!options.only && !options.yes) {
+  } else if (!options.yes) {
     const ok = await confirm({
       message: `Update all ${totalOutdated} outdated package(s)?`,
       default: true,
