@@ -1,6 +1,9 @@
 import type { PackageManager, OutdatedPackage, InstalledPackage, UpdateResult, ProgressReporter } from "./types.ts";
-import { exec, isInstalled } from "../utils/exec.ts";
+import { exec } from "../utils/exec.ts";
 import { runSudo } from "../utils/sudo.ts";
+import { accessSync, constants } from "node:fs";
+
+const SOFTWAREUPDATE = "/usr/sbin/softwareupdate";
 
 let noSudoGlobal = false;
 
@@ -14,11 +17,16 @@ export const macos: PackageManager = {
   icon: "🍎",
 
   async detect(): Promise<boolean> {
-    return isInstalled("softwareupdate");
+    try {
+      accessSync(SOFTWAREUPDATE, constants.X_OK);
+      return true;
+    } catch {
+      return false;
+    }
   },
 
   async listOutdated(): Promise<OutdatedPackage[]> {
-    const result = await exec(["softwareupdate", "--list"]);
+    const result = await exec([SOFTWAREUPDATE, "--list"]);
     const output = result.stdout + "\n" + result.stderr;
     const updates: OutdatedPackage[] = [];
     const labelRegex = /\*\s+Label:\s*(.+)/g;
@@ -46,8 +54,8 @@ export const macos: PackageManager = {
   async update(dryRun = false, packages?: string[], onProgress?: ProgressReporter): Promise<UpdateResult> {
     if (dryRun) return { manager: "macOS System", success: true, updated: packages?.length ?? 0, output: "dry run" };
     const cmd = packages && packages.length > 0
-      ? ["softwareupdate", "--install", ...packages]
-      : ["softwareupdate", "--install", "--all", "--restart"];
+      ? [SOFTWAREUPDATE, "--install", ...packages]
+      : [SOFTWAREUPDATE, "--install", "--all", "--restart"];
     onProgress?.(`Downloading and installing ${packages?.length ?? "all"} macOS update(s)…`);
     const result = await runSudo(cmd, noSudoGlobal, { onLine: onProgress });
     return { manager: "macOS System", success: result.exitCode === 0, updated: packages?.length ?? 0, output: result.stdout, error: result.exitCode !== 0 ? result.stderr : undefined };

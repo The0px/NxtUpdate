@@ -8,10 +8,10 @@ export async function runSudo(
   if (noSudo) {
     return exec(command, options);
   }
-  return exec(["sudo", ...command], options);
+  return exec(["/usr/bin/sudo", ...command], options);
 }
 
 export async function hasSudoAccess(): Promise<boolean> {
-  const result = await exec(["sudo", "-n", "true"]);
+  const result = await exec(["/usr/bin/sudo", "-n", "true"]);
   return result.exitCode === 0;
 }
