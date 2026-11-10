@@ -1,10 +1,10 @@
 {
   "name": "nxtupdate",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Universal package updater for macOS - auto-detects and updates everything",
   "type": "module",
   "bin": {
-    "nxtupdate": "./src/cli.ts"
+    "nxtupdate": "src/cli.ts"
   },
   "files": [
     "src"
@@ -33,11 +33,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/scorpion7slayer/NxtUpdate.git"
+    "url": "git+https://github.com/The0px/NxtUpdate.git"
   },
-  "homepage": "https://github.com/scorpion7slayer/NxtUpdate#readme",
+  "homepage": "https://github.com/The0px/NxtUpdate#readme",
   "bugs": {
-    "url": "https://github.com/scorpion7slayer/NxtUpdate/issues"
+    "url": "https://github.com/The0px/NxtUpdate/issues"
   },
   "devDependencies": {
     "@types/bun": "latest",

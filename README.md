@@ -3,7 +3,7 @@
 > Universal package updater for macOS — auto-detects and updates everything from one command.
 
 [![npm version](https://img.shields.io/npm/v/nxtupdate)](https://www.npmjs.com/package/nxtupdate)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/scorpion7slayer/NxtUpdate/blob/main/LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/The0px/NxtUpdate/blob/main/LICENSE)
 [![Requires Bun](https://img.shields.io/badge/runtime-bun-%23f9f1e1)](https://bun.sh)
 
 NxtUpdate detects every package manager installed on your Mac and updates them all in one go — with an interactive TUI or simple CLI commands.
@@ -119,7 +119,7 @@ cargo install cargo-install-update
 
 ## Repository
 
-[https://github.com/scorpion7slayer/NxtUpdate](https://github.com/scorpion7slayer/NxtUpdate)
+[https://github.com/The0px/NxtUpdate](https://github.com/The0px/NxtUpdate)
 
 ---
 
