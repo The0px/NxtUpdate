@@ -78,8 +78,8 @@ describe("terminal interface", () => {
       { columns: 80 }
     );
 
-    expect(output).toContain("Actions");
-    expect(output).toContain("2 outdated across 1 manager(s)");
+    expect(output).toContain("Update everything");
+    expect(output).toContain("2 update(s) available across 1 source(s)");
     expectWithinWidth(output, 80);
     expectWithinRows(output, 24);
   });
@@ -137,7 +137,7 @@ describe("terminal interface", () => {
     expect(output).toContain("No actionable updates");
     expect(output).toContain("Python (pip) skipped · externally managed (PEP 668)");
     expect(output).not.toContain("Everything is up to date");
-    expect(output).toContain("[esc/q] back");
+    expect(output).toContain("esc back");
     expect(output).not.toContain("[↑↓/jk] move");
     expectWithinWidth(output, 80);
     expectWithinRows(output, 24);
@@ -167,9 +167,9 @@ describe("terminal interface", () => {
       { columns: 80 },
     );
 
-    expect(output).toContain("20 across 1 manager(s)");
+    expect(output).toContain("20 across 1 source(s)");
     expect(output).toContain("Python (pip) skipped");
-    expect(output).toContain("more below");
+    expect(output).toContain("↓ 8 more");
     expectWithinWidth(output, 80);
     expectWithinRows(output, 24);
   });
@@ -187,7 +187,8 @@ describe("terminal interface", () => {
     );
 
     expect(output).toContain("0/2 selected");
-    expect(output).toContain("□");
+    expect(output).toContain("○ alpha-package");
+    expect(output).not.toContain("◉");
     expectWithinWidth(output, 80);
     expectWithinRows(output, 24);
   });
@@ -206,7 +207,8 @@ describe("terminal interface", () => {
     );
 
     expect(output).toContain("1/2 selected");
-    expect(output).toContain("◩");
+    expect(output).toContain("◎");
+    expect(output).toContain("◉ alpha-package");
     expectWithinWidth(output, 80);
     expectWithinRows(output, 24);
   });
@@ -317,7 +319,7 @@ describe("terminal interface", () => {
     stdout.on("data", (chunk) => {
       const frame = chunk.toString();
       if (frame.includes("Downloading alpha-package 42%")) resolveLiveFrame(frame);
-      if (frame.includes("1 package(s) updated")) resolveCompletedFrame(frame);
+      if (frame.includes("1 item(s) updated")) resolveCompletedFrame(frame);
     });
 
     const instance = render(
@@ -335,16 +337,15 @@ describe("terminal interface", () => {
     try {
       const activeFrame = await liveFrame;
       expect(managerFinished).toBe(false);
-      expect(activeFrame).toContain("working · 1 package(s)");
-      expect(activeFrame).toContain("NxtUpdate is still working");
-      expect(activeFrame).toContain("0/1 package(s) finished");
+      expect(activeFrame).toContain("0/1");
+      expect(activeFrame).toContain("Downloading alpha-package 42%");
       expectWithinWidth(activeFrame, 80);
       expectWithinRows(activeFrame, 24);
 
       finishUpdate({ manager: "Homebrew", success: true, updated: 1, output: "" });
       const finalFrame = await completedFrame;
       expect(managerFinished).toBe(true);
-      expect(finalFrame).toContain("1 package(s) updated");
+      expect(finalFrame).toContain("1 item(s) updated");
     } finally {
       instance.unmount();
       instance.cleanup();

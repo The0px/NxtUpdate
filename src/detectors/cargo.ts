@@ -1,10 +1,12 @@
 import type { PackageManager, OutdatedPackage, InstalledPackage, UpdateResult, ProgressReporter } from "./types.ts";
 import { exec, isInstalled } from "../utils/exec.ts";
+import { assertSafePackageNames } from "../utils/validate.ts";
 
 export const cargo: PackageManager = {
   name: "Rust (Cargo)",
   command: "cargo",
   icon: "🦀",
+  category: "packages",
 
   async detect(): Promise<boolean> {
     return isInstalled("cargo");
@@ -35,6 +37,7 @@ export const cargo: PackageManager = {
     if (!isInstalled("cargo-install-update")) {
       return { manager: "Rust (Cargo)", success: false, updated: 0, output: "", error: "cargo-install-update not installed. Run: cargo install cargo-install-update" };
     }
+    assertSafePackageNames("cargo", packages ?? []);
     const cmd = packages && packages.length > 0 ? ["cargo", "install-update", ...packages] : ["cargo", "install-update", "--all"];
     onProgress?.(`Downloading and installing ${packages?.length ?? "all"} Cargo package(s)…`);
     const result = await exec(cmd, { onLine: onProgress });
@@ -44,6 +47,7 @@ export const cargo: PackageManager = {
   async uninstall(dryRun = false, packages?: string[], onProgress?: ProgressReporter): Promise<UpdateResult> {
     if (!packages?.length) return { manager: "Rust (Cargo)", success: true, updated: 0, output: "Nothing to uninstall" };
     if (dryRun) return { manager: "Rust (Cargo)", success: true, updated: packages.length, output: "dry run" };
+    assertSafePackageNames("cargo", packages);
     onProgress?.(`Removing ${packages.length} Cargo package(s)…`);
     const result = await exec(["cargo", "uninstall", ...packages], { onLine: onProgress });
     return { manager: "Rust (Cargo)", success: result.exitCode === 0, updated: packages.length, output: result.stdout, error: result.exitCode !== 0 ? result.stderr : undefined };

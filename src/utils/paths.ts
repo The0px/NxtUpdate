@@ -1,4 +1,5 @@
 import { exec } from "./exec.ts";
+import { sanitizeLine } from "./sanitize.ts";
 
 let npmRootPromise: Promise<string> | null = null;
 
@@ -38,6 +39,10 @@ export async function getBrewPath(pkg: string): Promise<string> {
 }
 
 export async function getPackagePath(pm: string, pkg: string): Promise<string> {
+  return sanitizeLine(await resolvePackagePath(pm, pkg), 1000);
+}
+
+async function resolvePackagePath(pm: string, pkg: string): Promise<string> {
   const lower = pm.toLowerCase();
   if (lower.includes("homebrew") || lower.includes("brew")) return getBrewPath(pkg);
   if (lower.includes("node") || lower.includes("npm")) return getNpmPath(pkg);

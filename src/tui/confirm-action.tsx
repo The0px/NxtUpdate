@@ -1,7 +1,10 @@
-import { Box, Text, useInput } from "ink";
+import { Box, Text } from "ink";
 import type { ManagerData } from "./app.tsx";
 import { KeyHints } from "./key-hints.tsx";
 import { useTerminalSize } from "./use-terminal-size.ts";
+import { useKeys } from "./use-keys.ts";
+import { borderStyle, colors, glyphs } from "../ui/theme.ts";
+import { Header } from "./ui.tsx";
 
 interface Props {
   managers: ManagerData[];
@@ -14,12 +17,13 @@ export function ConfirmUninstallScreen({ managers, dryRun = false, onConfirm, on
   const { columns, rows } = useTerminalSize();
   const compact = columns < 96 || rows < 28;
   const packages = managers.flatMap((manager) =>
-    manager.outdated.map((pkg) => ({ manager: manager.manager.name, name: pkg.name }))
+    manager.outdated.map((pkg) => ({ manager: manager.manager.name, name: pkg.name, method: pkg.method, detail: pkg.detail }))
   );
-  const previewLimit = Math.max(3, rows - 14);
+  const withDetail = packages.some((pkg) => pkg.detail);
+  const previewLimit = Math.max(3, Math.floor((rows - 14) / (withDetail ? 2 : 1)));
   const preview = packages.slice(0, previewLimit);
 
-  useInput((input, key) => {
+  useKeys((input, key) => {
     if (input === "y") {
       onConfirm();
       return;
@@ -29,40 +33,37 @@ export function ConfirmUninstallScreen({ managers, dryRun = false, onConfirm, on
     }
   });
 
+  const tone = dryRun ? colors.warning : colors.danger;
+
   return (
     <Box flexDirection="column" paddingX={1}>
-      <Text bold color={dryRun ? "yellow" : "red"}>
-        {dryRun ? "⚡ Confirm uninstall dry run" : "⚠ Confirm package removal"}
-      </Text>
+      <Header title={dryRun ? "uninstall preview" : "confirm removal"} titleColor={tone} dryRun={dryRun} />
       <Text>
-        {packages.length} package(s) across {managers.length} manager(s)
-        {dryRun ? " will be previewed." : " will be removed."}
+        <Text color={tone} bold>{glyphs().warn} </Text>
+        {packages.length} item(s) from {managers.length} source(s)
+        {dryRun ? " will be previewed, nothing is removed." : " will be removed."}
       </Text>
 
-      <Box flexDirection="column" borderStyle="single" borderColor={dryRun ? "yellow" : "red"} paddingX={1} marginTop={1}>
+      <Box flexDirection="column" borderStyle={borderStyle()} borderColor={tone} paddingX={1} marginTop={1}>
         {preview.map((pkg) => (
-          <Text key={`${pkg.manager}-${pkg.name}`} wrap="truncate-middle">
-            {pkg.manager} · {pkg.name}
-          </Text>
+          <Box key={`${pkg.manager}-${pkg.name}`} flexDirection="column">
+            <Text wrap="truncate-middle">
+              {pkg.name}
+              <Text color={colors.textMuted}>  {pkg.manager}{pkg.method ? ` · ${pkg.method}` : ""}</Text>
+            </Text>
+            {pkg.detail && <Text color={colors.textMuted} wrap="truncate-middle">  {pkg.detail}</Text>}
+          </Box>
         ))}
         {packages.length > preview.length && (
-          <Text>…and {packages.length - preview.length} more</Text>
+          <Text color={colors.textMuted}>…and {packages.length - preview.length} more</Text>
         )}
-      </Box>
-
-      <Box marginTop={1}>
-        <Text color={dryRun ? "yellow" : "red"}>
-          {dryRun
-            ? "No package will be removed in dry-run mode."
-            : "This uses each package manager's native uninstall command."}
-        </Text>
       </Box>
 
       <KeyHints
         compact={compact}
         hints={[
-          { keys: "y", label: dryRun ? "run preview" : "uninstall" },
-          { keys: "n/esc/q/←", label: "cancel" },
+          { keys: "y", label: dryRun ? "run preview" : "uninstall", onPress: onConfirm },
+          { keys: "n", label: "cancel", onPress: onBack },
         ]}
       />
     </Box>

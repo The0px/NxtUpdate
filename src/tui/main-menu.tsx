@@ -1,11 +1,17 @@
-import { Box, Text, Spacer, useApp, useInput } from "ink";
+import { Box, Text, useApp } from "ink";
 import { useEffect } from "react";
 import type { ManagerData } from "./app.tsx";
 import type { CliOptions } from "../detectors/types.ts";
 import type { UpdateInfo } from "../utils/version.ts";
-import { VERSION, getVersionDelta } from "../utils/version.ts";
+import { getVersionDelta } from "../utils/version.ts";
+import { colors, glyphs, managerIcon } from "../ui/theme.ts";
 import { KeyHints } from "./key-hints.tsx";
 import { useTerminalSize } from "./use-terminal-size.ts";
+import { useKeys } from "./use-keys.ts";
+import { orderByCategory } from "./use-list-nav.ts";
+import { Clickable } from "./mouse.tsx";
+import { useReveal } from "./motion.ts";
+import { DeltaTag, Header, Row, SectionLabel, Tag } from "./ui.tsx";
 
 interface Props {
   managers: ManagerData[];
@@ -14,26 +20,34 @@ interface Props {
   selected: number;
   onSelectionChange: (index: number) => void;
   onStartUpdate: () => void;
+  onUpdateAgents?: () => void;
   onUninstall: () => void;
   onViewList: () => void;
   onViewMoleTip: () => void;
 }
 
-export type MenuAction = "update" | "uninstall" | "mole-tip" | "list" | "quit";
+export type MenuAction = "update" | "agents" | "uninstall" | "mole-tip" | "list" | "quit";
 
-export function isMenuActionDisabled(action: MenuAction | undefined, totalOutdated: number): boolean {
-  return totalOutdated === 0 && action === "update";
+export function isMenuActionDisabled(
+  action: MenuAction | undefined,
+  totalOutdated: number,
+  agentsOutdated = 0,
+): boolean {
+  if (action === "update") return totalOutdated === 0;
+  if (action === "agents") return agentsOutdated === 0;
+  return false;
 }
 
-const menuItems: { label: string; action: MenuAction; icon: string; hint: string; key: string }[] = [
-  { label: "Update packages",       action: "update",    icon: "↑", hint: "Select and update outdated packages", key: "u" },
-  { label: "Uninstall packages",    action: "uninstall", icon: "−", hint: "Review installed packages before removal", key: "x" },
-  { label: "Mole for macOS apps",   action: "mole-tip",  icon: "◇", hint: "Open Mole CLI instructions and application link", key: "m" },
-  { label: "View outdated list",    action: "list",      icon: "≡", hint: "Browse every outdated package", key: "l" },
-  { label: "Quit",                  action: "quit",      icon: "·", hint: "Exit NxtUpdate", key: "q" },
-];
+type IconKey = "update" | "uninstall" | "list" | "app" | "quit" | "ai";
 
-const deltaColor = { MAJOR: "red", minor: "yellow", patch: "green" } as const;
+const menuItems: { label: string; action: MenuAction; icon: IconKey; hint: string; key: string }[] = [
+  { label: "Update everything",    action: "update",    icon: "update",    hint: "Select and update outdated agents and packages", key: "u" },
+  { label: "Update AI agents",     action: "agents",    icon: "ai",        hint: "Claude, Codex, Cursor, Vibe and more", key: "i" },
+  { label: "Uninstall",            action: "uninstall", icon: "uninstall", hint: "Remove AI agents or packages after review", key: "x" },
+  { label: "View outdated list",   action: "list",      icon: "list",      hint: "Browse every outdated package", key: "l" },
+  { label: "Mole for macOS apps",  action: "mole-tip",  icon: "app",       hint: "Open Mole CLI instructions and application link", key: "m" },
+  { label: "Quit",                 action: "quit",      icon: "quit",      hint: "Exit NxtUpdate", key: "q" },
+];
 
 export function MainMenu({
   managers,
@@ -42,24 +56,27 @@ export function MainMenu({
   selected,
   onSelectionChange,
   onStartUpdate,
+  onUpdateAgents,
   onUninstall,
   onViewList,
   onViewMoleTip,
 }: Props) {
+  const g = glyphs();
   const { exit } = useApp();
   const { columns, rows } = useTerminalSize();
   const compact = columns < 96 || rows < 28;
-  const withOutdated = managers.filter((manager) => manager.outdated.length > 0);
-  const skipped = managers.filter((manager) => manager.manager.skipReason);
-  const upToDate = managers.filter(
-    (manager) => manager.outdated.length === 0 && !manager.manager.skipReason
-  );
+  const ordered = orderByCategory(managers);
+  const withOutdated = ordered.filter((manager) => manager.outdated.length > 0);
+  const skipped = ordered.filter((manager) => manager.manager.skipReason);
+  const upToDate = ordered.filter((manager) => manager.outdated.length === 0 && !manager.manager.skipReason);
   const totalOutdated = withOutdated.reduce((sum, manager) => sum + manager.outdated.length, 0);
+  const agents = withOutdated.find((manager) => manager.manager.category === "ai");
+  const agentsOutdated = agents?.outdated.length ?? 0;
+  const packageManagers = withOutdated.filter((manager) => manager.manager.category !== "ai");
 
-  const isDisabled = (index: number) => {
-    const action = menuItems[index]?.action;
-    return isMenuActionDisabled(action, totalOutdated);
-  };
+  const isDisabled = (index: number) =>
+    isMenuActionDisabled(menuItems[index]?.action, totalOutdated, agentsOutdated)
+    || (menuItems[index]?.action === "agents" && !onUpdateAgents);
 
   const moveSelection = (direction: -1 | 1) => {
     for (let step = 1; step <= menuItems.length; step++) {
@@ -75,6 +92,7 @@ export function MainMenu({
     if (isDisabled(index)) return;
     switch (menuItems[index]!.action) {
       case "update":    onStartUpdate(); break;
+      case "agents":    onUpdateAgents?.(); break;
       case "uninstall": onUninstall(); break;
       case "mole-tip":  onViewMoleTip(); break;
       case "list":      onViewList(); break;
@@ -87,157 +105,150 @@ export function MainMenu({
       const firstAvailable = menuItems.findIndex((_, index) => !isDisabled(index));
       if (firstAvailable >= 0) onSelectionChange(firstAvailable);
     }
-  }, [totalOutdated, selected]);
+  }, [totalOutdated, agentsOutdated, selected]);
 
-  useInput((input, key) => {
-    if (key.upArrow || input === "k") {
-      moveSelection(-1);
-      return;
-    }
-    if (key.downArrow || input === "j") {
-      moveSelection(1);
-      return;
-    }
-    if (key.return || key.rightArrow) {
-      doSelect(selected);
-      return;
-    }
-
+  useKeys((input, key) => {
+    if (key.upArrow || input === "k") return moveSelection(-1);
+    if (key.downArrow || input === "j") return moveSelection(1);
+    if (key.return || key.rightArrow) return doSelect(selected);
     const byKey = menuItems.findIndex((item) => item.key === input);
-    if (byKey >= 0) {
+    if (byKey >= 0 && !isDisabled(byKey)) {
       onSelectionChange(byKey);
       doSelect(byKey);
     }
   });
 
-  const previewManagers = withOutdated.slice(0, compact ? 3 : Math.max(3, rows - 18));
+  const agentPreview = agents?.outdated.slice(0, compact ? 2 : 4) ?? [];
+  const previewManagers = packageManagers.slice(0, compact ? 2 : Math.max(3, rows - 22));
+  const iconFor = (icon: IconKey) => icon === "ai" ? g.managers.ai! : g[icon];
+  const revealed = useReveal(menuItems.length);
 
-  return (
-    <Box flexDirection="column" paddingX={1}>
-      <Box marginBottom={1}>
-        <Text bold color="cyan">NxtUpdate</Text>
-        <Text> · macOS package maintenance</Text>
-        {options.dryRun && <Text color="yellow"> · DRY RUN</Text>}
-        <Spacer />
-        <Text>v{VERSION}</Text>
+  const actions = (
+    <Box flexDirection="column" width={compact ? "100%" : 34} flexShrink={0}>
+      {menuItems.slice(0, revealed).map((item, index) => {
+        const active = index === selected;
+        const disabled = isDisabled(index);
+        const color = disabled ? colors.textMuted : active ? colors.accent : colors.text;
+        return (
+          <Row
+            key={item.action}
+            active={active}
+            onHover={disabled ? undefined : () => { if (index !== selected) onSelectionChange(index); }}
+            onClick={() => {
+              if (disabled) return;
+              onSelectionChange(index);
+              doSelect(index);
+            }}
+          >
+            <Text wrap="truncate-end">
+              <Text color={disabled ? colors.textMuted : item.action === "agents" ? colors.accent : colors.textMuted}>{iconFor(item.icon)} </Text>
+              <Text bold={active} color={color} dimColor={disabled}>{item.label}</Text>
+              <Text color={colors.border}>  {item.key}</Text>
+            </Text>
+          </Row>
+        );
+      })}
+      <Box marginTop={1} marginLeft={2}>
+        <Text color={colors.textMuted} wrap="wrap">{menuItems[selected]?.hint ?? ""}</Text>
       </Box>
+    </Box>
+  );
 
-      {updateInfo?.hasUpdate && (
-        <Box marginBottom={1} borderStyle="single" borderColor="yellow" paddingX={1}>
-          <Text color="yellow" bold>Update available </Text>
-          <Text>v{updateInfo.current} → v{updateInfo.latest}</Text>
-          {!compact && <Text> · npm i -g nxtupdate</Text>}
-        </Box>
+  const status = (
+    <Box flexDirection="column" flexGrow={1} marginTop={compact ? 1 : 0}>
+      {totalOutdated > 0 ? (
+        <Text>
+          <Text bold color={colors.warning}>{totalOutdated}</Text>
+          <Text color={colors.textMuted}> update(s) available across {withOutdated.length} source(s)</Text>
+        </Text>
+      ) : (
+        <Text color={colors.success}>
+          {g.ok} {skipped.length > 0 ? "No actionable updates" : "Everything is up to date"}
+        </Text>
       )}
 
-      <Box flexDirection={compact ? "column" : "row"} gap={1}>
-        <Box
-          flexDirection="column"
-          width={compact ? "100%" : 38}
-          borderStyle="single"
-          borderColor="gray"
-          paddingX={1}
-        >
-          <Text bold>Actions</Text>
-          <Box marginTop={compact ? 0 : 1} flexDirection="column">
-            {menuItems.map((item, index) => {
-              const active = index === selected;
-              const disabled = isDisabled(index);
-              return (
-                <Box key={item.action}>
-                  <Text
-                    bold={active}
-                    inverse={active}
-                    color={disabled ? "gray" : active ? undefined : "white"}
-                  >
-                    {active ? " › " : "   "}
-                    {item.icon} {item.label}
-                  </Text>
-                  {!active && <Text color={disabled ? "gray" : undefined}> [{item.key}]</Text>}
-                </Box>
-              );
-            })}
-          </Box>
-          <Box marginTop={compact ? 0 : 1}>
-            <Text wrap="truncate-end">{menuItems[selected]?.hint ?? ""}</Text>
-          </Box>
-        </Box>
-
-        <Box
-          flexDirection="column"
-          flexGrow={compact ? 0 : 1}
-          width={compact ? "100%" : undefined}
-          borderStyle="single"
-          borderColor="gray"
-          paddingX={1}
-        >
-          <Box justifyContent="space-between">
-            <Text bold>System status</Text>
-            <Text>{managers.length} manager(s)</Text>
-          </Box>
-
-          <Box marginTop={compact ? 0 : 1}>
-            {totalOutdated > 0 ? (
-              <Text>
-                <Text bold color="yellow">{totalOutdated}</Text>
-                {" outdated across "}
-                <Text bold color="yellow">{withOutdated.length}</Text>
-                {" manager(s)"}
-              </Text>
-            ) : (
-              <Text color="green" bold>
-                {skipped.length > 0 ? "✔ No actionable updates" : "✔ Everything is up to date"}
-              </Text>
-            )}
-          </Box>
-
-          {previewManagers.map((manager) => (
-            <Box key={manager.manager.name} flexDirection="column" marginTop={compact ? 0 : 1}>
-              <Text wrap="truncate-end">
-                <Text bold>{manager.manager.icon} {manager.manager.name}</Text>
-                <Text color="yellow"> · {manager.outdated.length} outdated</Text>
-              </Text>
-              {!compact && manager.outdated.slice(0, 2).map((pkg) => {
-                const delta = getVersionDelta(pkg.current, pkg.latest);
-                return (
-                  <Text key={pkg.name} wrap="truncate-middle">
-                    {"  · "}{pkg.name} {pkg.current} → {pkg.latest}
-                    <Text bold color={deltaColor[delta]}> [{delta}]</Text>
-                  </Text>
-                );
-              })}
-            </Box>
+      {agents && (
+        <Clickable flexDirection="column" marginTop={1} onClick={onUpdateAgents}>
+          <SectionLabel category="ai" />
+          {agentPreview.map((pkg) => (
+            <Text key={pkg.name} wrap="truncate-middle">
+              {"  "}{pkg.name}
+              <Text color={colors.textMuted}>  {pkg.current} {g.arrow} {pkg.uncertain ? "?" : pkg.latest}  </Text>
+              {pkg.method && <Tag>{pkg.method}</Tag>}
+            </Text>
           ))}
-
-          {withOutdated.length > previewManagers.length && (
-            <Text>…and {withOutdated.length - previewManagers.length} more manager(s)</Text>
+          {agentsOutdated > agentPreview.length && (
+            <Text color={colors.textMuted}>  …and {agentsOutdated - agentPreview.length} more</Text>
           )}
+        </Clickable>
+      )}
 
-          {upToDate.length > 0 && (
-            <Box marginTop={compact ? 0 : 1}>
-              <Text color="green">✔ {upToDate.length} manager(s) current</Text>
-            </Box>
-          )}
-
-          {skipped.length > 0 && (
-            <Box marginTop={compact ? 0 : 1} flexDirection="column">
-              {skipped.map((manager) => (
-                <Text key={manager.manager.name} color="yellow" wrap="truncate-end">
-                  ○ {manager.manager.name} skipped · {manager.manager.skipReason}
+      {previewManagers.length > 0 && (
+        <Box flexDirection="column" marginTop={1}>
+          <SectionLabel category="packages" />
+          {previewManagers.map((manager) => (
+            <Box key={manager.manager.name} flexDirection="column">
+              <Text wrap="truncate-end">
+                {"  "}<Text color={colors.textMuted}>{managerIcon(manager.manager)} </Text>
+                {manager.manager.name}
+                <Text color={colors.warning}>  {manager.outdated.length}</Text>
+              </Text>
+              {!compact && manager.outdated.slice(0, 2).map((pkg) => (
+                <Text key={pkg.name} wrap="truncate-middle" color={colors.textMuted}>
+                  {"     "}{pkg.name}  {pkg.current} {g.arrow} {pkg.latest}
+                  <DeltaTag delta={getVersionDelta(pkg.current, pkg.latest)} />
                 </Text>
               ))}
             </Box>
+          ))}
+          {packageManagers.length > previewManagers.length && (
+            <Text color={colors.textMuted}>  …and {packageManagers.length - previewManagers.length} more</Text>
           )}
         </Box>
+      )}
+
+      {(upToDate.length > 0 || skipped.length > 0) && (
+        <Box flexDirection="column" marginTop={1}>
+          {upToDate.length > 0 && (
+            <Text color={colors.textMuted} wrap="truncate-end">
+              <Text color={colors.success}>{g.ok}</Text> {upToDate.map((manager) => manager.manager.name).join(", ")} up to date
+            </Text>
+          )}
+          {skipped.map((manager) => (
+            <Text key={manager.manager.name} color={colors.textMuted} wrap="truncate-end">
+              <Text color={colors.warning}>{g.skip}</Text> {manager.manager.name} skipped · {manager.manager.skipReason}
+            </Text>
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
+
+  return (
+    <Box flexDirection="column" paddingX={1}>
+      <Header dryRun={options.dryRun} />
+
+      {updateInfo?.hasUpdate && (
+        <Box marginBottom={1}>
+          <Text>
+            <Text color={colors.warning}>{g.warn} NxtUpdate v{updateInfo.latest} is available</Text>
+            <Text color={colors.textMuted}> (v{updateInfo.current}){compact ? "" : " · npm i -g nxtupdate"}</Text>
+          </Text>
+        </Box>
+      )}
+
+      <Box flexDirection={compact ? "column" : "row"} columnGap={4}>
+        {actions}
+        {status}
       </Box>
 
       <KeyHints
         compact={compact}
         hints={[
-          { keys: "↑↓/jk", label: "move" },
-          { keys: "enter/→", label: "select" },
-          { keys: "u/x/m/l", label: "shortcuts" },
-          { keys: "q", label: "quit" },
+          { keys: "enter", label: "select", onPress: () => doSelect(selected) },
+          { keys: "↑↓", label: "move" },
+          { keys: "u i x l m", label: "shortcuts" },
+          { keys: "q", label: "quit", onPress: exit },
         ]}
       />
     </Box>

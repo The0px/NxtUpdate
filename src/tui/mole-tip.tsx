@@ -1,7 +1,11 @@
-import { Box, Text, useInput } from "ink";
+import { Box, Text } from "ink";
 import { useState } from "react";
 import { KeyHints } from "./key-hints.tsx";
 import { useTerminalSize } from "./use-terminal-size.ts";
+import { useKeys } from "./use-keys.ts";
+import { Clickable } from "./mouse.tsx";
+import { colors, glyphs } from "../ui/theme.ts";
+import { Header } from "./ui.tsx";
 
 export const MOLE_APP_AFFILIATE_URL = "https://mole.fit/?atp=SCo7Qr4nXn";
 export const MOLE_CLI_URL = "https://github.com/tw93/Mole";
@@ -28,7 +32,7 @@ export function MoleTipScreen({ onBack }: { onBack: () => void }) {
     }
   };
 
-  useInput((input, key) => {
+  useKeys((input, key) => {
     if (key.escape || input === "q" || key.leftArrow) {
       onBack();
       return;
@@ -40,48 +44,48 @@ export function MoleTipScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <Box flexDirection="column" paddingX={1}>
-      <Box marginBottom={1}>
-        <Text bold color="magenta">🐹 Uninstall macOS apps with Mole</Text>
-      </Box>
+      <Header title="mole" />
 
-      <Box flexDirection="column" borderStyle="single" borderColor="gray" paddingX={1}>
+      <Box flexDirection="column">
         <Text wrap="wrap">
           Mole uninstalls .app bundles and cleans their related files (caches, preferences, and logs).
         </Text>
 
         <Box marginTop={1} flexDirection="column">
           <Text bold>Mole CLI — install:</Text>
-          <Text color="cyan">  brew install mole</Text>
+          <Text color={colors.accent}>  brew install mole</Text>
           <Text bold>Mole CLI — run:</Text>
-          <Text color="cyan">  mole</Text>
+          <Text color={colors.accent}>  mole</Text>
         </Box>
 
         <Box marginTop={1} flexDirection="column">
           <Text bold>Mole application website (affiliate link):</Text>
-          <Text color="cyan" wrap="truncate-end">  {MOLE_APP_AFFILIATE_URL}</Text>
+          <Clickable onClick={() => void openMoleApp()}>
+            <Text color={colors.accent} underline wrap="truncate-end">  {MOLE_APP_AFFILIATE_URL}</Text>
+          </Clickable>
         </Box>
 
         <Box marginTop={1} flexDirection="column">
           <Text bold>Mole CLI source:</Text>
-          <Text color="cyan" wrap="truncate-end">  {MOLE_CLI_URL}</Text>
+          <Text color={colors.textMuted} wrap="truncate-end">  {MOLE_CLI_URL}</Text>
         </Box>
       </Box>
 
       {linkState === "opening" && (
-        <Box marginTop={1}><Text color="yellow">Opening Mole application website…</Text></Box>
+        <Box marginTop={1}><Text color={colors.warning}>Opening Mole application website…</Text></Box>
       )}
       {linkState === "opened" && (
-        <Box marginTop={1}><Text color="green">✔ Mole application website opened in your browser.</Text></Box>
+        <Box marginTop={1}><Text color={colors.success}>{glyphs().ok} Mole application website opened in your browser.</Text></Box>
       )}
       {linkState === "error" && (
-        <Box marginTop={1}><Text color="red">✖ Could not open the browser. Copy the URL above.</Text></Box>
+        <Box marginTop={1}><Text color={colors.danger}>{glyphs().fail} Could not open the browser. Copy the URL above.</Text></Box>
       )}
 
       <KeyHints
         compact={compact}
         hints={[
-          { keys: "enter/o/→", label: "open app" },
-          { keys: "esc/q/←", label: "back" },
+          { keys: "enter", label: "open app", onPress: () => void openMoleApp() },
+          { keys: "esc", label: "back", onPress: onBack },
         ]}
       />
     </Box>

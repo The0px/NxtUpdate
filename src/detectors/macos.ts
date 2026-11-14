@@ -1,6 +1,7 @@
 import type { PackageManager, OutdatedPackage, InstalledPackage, UpdateResult, ProgressReporter } from "./types.ts";
 import { exec } from "../utils/exec.ts";
 import { runSudo } from "../utils/sudo.ts";
+import { assertSafePackageNames } from "../utils/validate.ts";
 import { accessSync, constants } from "node:fs";
 
 const SOFTWAREUPDATE = "/usr/sbin/softwareupdate";
@@ -15,6 +16,7 @@ export const macos: PackageManager = {
   name: "macOS System",
   command: "softwareupdate",
   icon: "🍎",
+  category: "system",
 
   async detect(): Promise<boolean> {
     try {
@@ -52,12 +54,16 @@ export const macos: PackageManager = {
   },
 
   async update(dryRun = false, packages?: string[], onProgress?: ProgressReporter): Promise<UpdateResult> {
+    assertSafePackageNames("softwareupdate", packages ?? []);
+    if (noSudoGlobal) {
+      return { manager: "macOS System", success: false, updated: 0, output: "", error: "Skipped: macOS updates need sudo and --no-sudo is set" };
+    }
     if (dryRun) return { manager: "macOS System", success: true, updated: packages?.length ?? 0, output: "dry run" };
     const cmd = packages && packages.length > 0
       ? [SOFTWAREUPDATE, "--install", ...packages]
-      : [SOFTWAREUPDATE, "--install", "--all", "--restart"];
+      : [SOFTWAREUPDATE, "--install", "--all"];
     onProgress?.(`Downloading and installing ${packages?.length ?? "all"} macOS update(s)…`);
-    const result = await runSudo(cmd, noSudoGlobal, { onLine: onProgress });
+    const result = await runSudo(cmd, { onLine: onProgress });
     return { manager: "macOS System", success: result.exitCode === 0, updated: packages?.length ?? 0, output: result.stdout, error: result.exitCode !== 0 ? result.stderr : undefined };
   },
 
