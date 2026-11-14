@@ -1,6 +1,7 @@
 import type { PackageManager, OutdatedPackage, InstalledPackage, UpdateResult, ProgressReporter } from "./types.ts";
 import { exec, isInstalled } from "../utils/exec.ts";
 import { listOutdatedViaRegistry, getGlobalPackages } from "../utils/registry.ts";
+import { assertSafePackageNames } from "../utils/validate.ts";
 
 function detectPrimaryPM(): string | null {
   // npm first — most reliable for global packages
@@ -44,6 +45,7 @@ export const node: PackageManager = {
   name: `Node (${detectAllPMs().join("/")})`,
   command: "node",
   icon: "📦",
+  category: "packages",
 
   async detect(): Promise<boolean> {
     return detectPrimaryPM() !== null;
@@ -58,6 +60,7 @@ export const node: PackageManager = {
   },
 
   async update(dryRun = false, packages?: string[], onProgress?: ProgressReporter): Promise<UpdateResult> {
+    assertSafePackageNames("npm", packages ?? []);
     const pm = detectPrimaryPM() ?? "npm";
     if (dryRun) return { manager: "Node", success: true, updated: packages?.length ?? 0, output: "dry run" };
     const cmd = cmdFor(pm, "update", packages);
@@ -68,6 +71,7 @@ export const node: PackageManager = {
 
   async uninstall(dryRun = false, packages?: string[], onProgress?: ProgressReporter): Promise<UpdateResult> {
     if (!packages?.length) return { manager: "Node", success: true, updated: 0, output: "Nothing to uninstall" };
+    assertSafePackageNames("npm", packages);
     const pm = detectPrimaryPM() ?? "npm";
     if (dryRun) return { manager: "Node", success: true, updated: packages.length, output: "dry run" };
     const cmd = cmdFor(pm, "uninstall", packages);

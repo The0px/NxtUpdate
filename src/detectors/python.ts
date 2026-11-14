@@ -1,5 +1,6 @@
 import type { PackageManager, OutdatedPackage, InstalledPackage, UpdateResult, ProgressReporter } from "./types.ts";
 import { exec, isInstalled, type ExecOptions } from "../utils/exec.ts";
+import { assertSafePackageNames } from "../utils/validate.ts";
 
 function getPipCommand(): string | null {
   // Skip if inside a virtualenv — only show global packages
@@ -62,6 +63,7 @@ export function createPythonManager({
     name: "Python (pip)",
     command: "pip3",
     icon: "🐍",
+    category: "packages",
 
     async detect(): Promise<boolean> {
       const pip = findPip();
@@ -98,6 +100,7 @@ export function createPythonManager({
       if (dryRun) return { manager: "Python (pip)", success: true, updated: packages?.length ?? 0, output: "dry run" };
       const names = packages && packages.length > 0 ? packages : (await manager.listOutdated()).map(p => p.name);
       if (!names.length) return { manager: "Python (pip)", success: true, updated: 0, output: "Nothing to update" };
+      assertSafePackageNames("pypi", names);
       onProgress?.(`Downloading and installing ${names.length} Python package(s)…`);
       const result = await execute([pip, "install", "--upgrade", ...names], { onLine: onProgress });
       return { manager: "Python (pip)", success: result.exitCode === 0, updated: names.length, output: result.stdout, error: result.exitCode !== 0 ? result.stderr : undefined };
@@ -109,6 +112,7 @@ export function createPythonManager({
       if (!pip) return { manager: "Python (pip)", success: false, updated: 0, output: "", error: "pip is not installed" };
       if (await isExternallyManaged(pip)) return blockedResult();
       if (dryRun) return { manager: "Python (pip)", success: true, updated: packages.length, output: "dry run" };
+      assertSafePackageNames("pypi", packages);
       onProgress?.(`Removing ${packages.length} Python package(s)…`);
       const result = await execute([pip, "uninstall", "-y", ...packages], { onLine: onProgress });
       return { manager: "Python (pip)", success: result.exitCode === 0, updated: packages.length, output: result.stdout, error: result.exitCode !== 0 ? result.stderr : undefined };

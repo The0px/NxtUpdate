@@ -45,9 +45,12 @@ export async function exec(
   command: string[],
   options?: ExecOptions,
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  if (!command[0]) throw new Error("exec: empty command");
+  // stdin fermé : un updater qui pose une question échoue au lieu de bloquer le TUI.
   const proc = Bun.spawn(command, {
     cwd: options?.cwd,
-    env: { ...process.env, ...options?.env },
+    env: { ...process.env, NO_COLOR: "1", ...options?.env },
+    stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
     timeout: options?.timeout ?? 300_000,
@@ -65,37 +68,6 @@ export async function exec(
     stderr,
     exitCode: proc.exitCode ?? 1,
   };
-}
-
-export function execSync(
-  command: string[]
-): { stdout: string; stderr: string; exitCode: number } {
-  const proc = Bun.spawnSync(command, {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-
-  return {
-    stdout: proc.stdout.toString().trim(),
-    stderr: proc.stderr.toString().trim(),
-    exitCode: proc.exitCode ?? 1,
-  };
-}
-
-export async function execStream(
-  command: string[],
-  onLine: (line: string) => void,
-  options?: { cwd?: string }
-): Promise<{ exitCode: number; lines: string[] }> {
-  const lines: string[] = [];
-  const result = await exec(command, {
-    cwd: options?.cwd,
-    onLine: (line) => {
-      lines.push(line);
-      onLine(line);
-    },
-  });
-  return { exitCode: result.exitCode, lines };
 }
 
 const executableCache = new Map<string, boolean>();

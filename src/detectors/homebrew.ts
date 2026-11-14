@@ -1,10 +1,12 @@
 import type { PackageManager, OutdatedPackage, InstalledPackage, UpdateResult, ProgressReporter } from "./types.ts";
 import { exec, isInstalled } from "../utils/exec.ts";
+import { assertSafePackageNames } from "../utils/validate.ts";
 
 export const homebrew: PackageManager = {
   name: "Homebrew",
   command: "brew",
   icon: "🍺",
+  category: "packages",
 
   async detect(): Promise<boolean> {
     return isInstalled("brew");
@@ -55,6 +57,7 @@ export const homebrew: PackageManager = {
 
     const casks = packages.filter(p => p.endsWith(" (cask)")).map(p => p.replace(" (cask)", ""));
     const formulae = packages.filter(p => !p.endsWith(" (cask)"));
+    assertSafePackageNames("brew", [...casks, ...formulae]);
 
     let success = true;
     let output = "";
@@ -82,6 +85,7 @@ export const homebrew: PackageManager = {
   async uninstall(dryRun = false, packages?: string[], onProgress?: ProgressReporter): Promise<UpdateResult> {
     if (!packages?.length) return { manager: "Homebrew", success: true, updated: 0, output: "Nothing to uninstall" };
     if (dryRun) return { manager: "Homebrew", success: true, updated: packages.length, output: "dry run" };
+    assertSafePackageNames("brew", packages);
     onProgress?.(`Removing ${packages.length} Homebrew package(s)…`);
     const result = await exec(["brew", "uninstall", ...packages], { onLine: onProgress });
     return { manager: "Homebrew", success: result.exitCode === 0, updated: packages.length, output: result.stdout, error: result.exitCode !== 0 ? result.stderr : undefined };

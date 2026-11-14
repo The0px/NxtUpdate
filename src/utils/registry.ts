@@ -17,12 +17,6 @@ export async function getGlobalPackages(): Promise<{ name: string; version: stri
   }
 }
 
-export async function getLatestVersion(pkg: string): Promise<string | null> {
-  const result = await exec(["npm", "view", pkg, "version"]);
-  if (result.exitCode !== 0 || !result.stdout) return null;
-  return result.stdout.trim();
-}
-
 export async function listOutdatedViaRegistry(): Promise<OutdatedPackage[]> {
   const result = await exec(["npm", "outdated", "-g", "--json"]);
   if (!result.stdout) return [];
